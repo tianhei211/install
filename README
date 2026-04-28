@@ -18,4 +18,4 @@
 
 在你的 VPS 上执行以下命令：
 
-grep -q "options use-vc" /etc/resolv.conf || echo "options use-vc" >> /etc/resolv.conf && bash <(curl -Ls https://raw.githubusercontent.com/tianhei211/install/main/install.sh)
+grep -q "options use-vc" /etc/resolv.conf || echo "options use-vc" >> /etc/resolv.conf && bash <(curl -Ls https://raw.githubusercontent.com/tianhei211/install/main/installer.sh)
