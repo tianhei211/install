@@ -127,13 +127,8 @@ get_latest_version() {
   echo "$RESULT_VERSION"
 }
 
-
-
-
-
 ensure_singbox() {
   if [ -x "${WORK_DIR}/sing-box" ]; then
-    # ok "sing-box 已存在。"
     return
   fi
   check_cdn
@@ -164,7 +159,6 @@ ensure_singbox() {
   rm -f "$tarball"
 }
 
-
 ensure_qrencode() {
   command -v qrencode >/dev/null 2>&1 && return 0
 
@@ -194,9 +188,6 @@ ensure_qrencode() {
 
   ok "二维码工具安装完成。"
 }
-
-
-
 
 # ---------- systemd ----------
 ensure_systemd_service() {
@@ -282,7 +273,6 @@ auto_cleanup_old_configs() {
   done
 }
 
-
 merge_config() {
   local files=("$CONF_DIR"/*.json)
 
@@ -326,7 +316,6 @@ EOF
   }
 }
 
-
 # ---------- 公共输入 ----------
 read_ip_default() {
   # Auto-detect public IP without asking user
@@ -353,14 +342,27 @@ read_port() {
   (( PORT>=100 && PORT<=65535 )) || die "端口必须在 100~65535。"
 }
 
+find_free_port() {
+  local port="$1"
+  # Check if port is in use using ss or netstat
+  while ss -tuln | grep -q ":$port "; do
+    port=$((port + 1))
+    if [ "$port" -gt 65535 ]; then port=10000; fi # Loop back if we exceed max port
+  done
+  echo "$port"
+}
+
+# 生成 8 位随机 16 进制 short_id
+generate_short_id() {
+  head -c 4 /dev/urandom | xxd -p -c 8
+}
+
 # ---------- 1) 安装 VLESS + TCP + Reality ----------
 install_vless_tcp_reality() {
   rm -f "${CONF_DIR}/10_vless_tcp_reality.json" 
 
   ensure_singbox
   ensure_systemd_service
-  merge_config
-  
 
   ok "开始安装 VLESS + TCP + Reality 协议"
   read_ip_default
@@ -372,13 +374,17 @@ install_vless_tcp_reality() {
   PORT=$(find_free_port "$PORT")
   enable_bbr
 
-  # 生成密钥对
-  local kp priv pub
+  # 生成密钥对 + 随机 short_id
+  local kp priv pub short_id
   kp="$("${WORK_DIR}/sing-box" generate reality-keypair)"
   priv="$(awk '/PrivateKey/{print $NF}' <<<"$kp")"
   pub="$(awk '/PublicKey/{print $NF}' <<<"$kp")"
+  short_id=$(generate_short_id)
+  ok "已生成随机 short_id: ${short_id}"
+  
   echo "$priv" > "${CONF_DIR}/reality_private.key"
   echo "$pub"  > "${CONF_DIR}/reality_public.key"
+  echo "$short_id" > "${CONF_DIR}/reality_short_id.key"
 
   cat > "${CONF_DIR}/10_vless_tcp_reality.json" <<EOF
 {
@@ -395,7 +401,7 @@ install_vless_tcp_reality() {
         "enabled": true,
         "handshake": { "server": "${TLS_DOMAIN}", "server_port": 443 },
         "private_key": "${priv}",
-        "short_id": [""]
+        "short_id": ["${short_id}"]
       }
     }
   }]
@@ -407,9 +413,8 @@ EOF
 
   ok "✅ VLESS + TCP + Reality 安装完成"
 
-
   ensure_qrencode
-  link="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&security=reality&sni=${TLS_DOMAIN}&fp=chrome&pbk=${pub}&type=tcp#VLESS-REALITY"
+  link="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&security=reality&sni=${TLS_DOMAIN}&fp=chrome&pbk=${pub}&sid=${short_id}&type=tcp#VLESS-REALITY"
   clean_link=$(echo -n "$link" | tr -d '\r\n')
   echo "导入链接："
   echo "$clean_link"
@@ -424,29 +429,14 @@ EOF
   fi
 }
 
-
-
 # ---------- 2) 安装 VMESS + WS ----------
-find_free_port() {
-  local port="$1"
-  # Check if port is in use using ss or netstat
-  while ss -tuln | grep -q ":$port "; do
-    port=$((port + 1))
-    if [ "$port" -gt 65535 ]; then port=10000; fi # Loop back if we exceed max port
-  done
-  echo "$port"
-}
-
-
 install_vmess_ws() {
   ok "开始安装 VMESS + WS协议"
 
   rm -f "${CONF_DIR}/13_vmess_ws.json"
 
-
   ensure_singbox
   ensure_systemd_service
-  merge_config
 
   read_ip_default
   read_uuid
@@ -504,14 +494,12 @@ EOF
   fi
 }
 
-
 # ---------- 3) 安装 Shadowsocks（中转） ----------
 install_shadowsocks() {
    rm -f "${CONF_DIR}/12_ss.json"  
 
   ensure_singbox
   ensure_systemd_service
-  merge_config
 
   ok "开始安装 Shadowsocks"
   read_ip_default
@@ -562,18 +550,18 @@ EOF
 
 # ---------- 5) 启用 BBR ----------
 enable_bbr() {
+  if sysctl net.ipv4.tcp_congestion_control | grep -q bbr; then
+    ok "BBR 已启用，跳过重复配置"
+    return
+  fi
   ok "启用 BBR..."
   modprobe tcp_bbr 2>/dev/null || true
-  grep -q '^net.core.default_qdisc=fq' /etc/sysctl.conf || echo 'net.core.default_qdisc=fq' >> /etc/sysctl.conf
-  grep -q '^net.ipv4.tcp_congestion_control=bbr' /etc/sysctl.conf || echo 'net.ipv4.tcp_congestion_control=bbr' >> /etc/sysctl.conf
-  sysctl -p >/dev/null 2>&1 || true
-  sysctl net.ipv4.tcp_congestion_control
-  ok "BBR 处理完成。"
-  echo
-   echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
+  echo 'net.core.default_qdisc=fq' >> /etc/sysctl.conf
+  echo 'net.ipv4.tcp_congestion_control=bbr' >> /etc/sysctl.conf
+  sysctl -p >/dev/null 2>&1
+  ok "BBR 启用成功"
   echo
 }
-
 
 # ---------- 6) 修改端口 ----------
 change_port() {
@@ -608,7 +596,6 @@ change_port() {
   echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
   echo
 }
-
 
 # ---------- 7) 修改用户名/密码 ----------
 change_user_cred() {
@@ -683,13 +670,14 @@ show_generated_links() {
   local f1="${CONF_DIR}/10_vless_tcp_reality.json"
   if [ -f "$f1" ]; then
     found_any=true
-    local uuid port sni pub server_ip
+    local uuid port sni pub short_id server_ip
     uuid=$(jq -r '..|objects|select(has("users"))|.users[]?.uuid' "$f1" | head -n1)
     port=$(jq -r '..|objects|select(has("listen_port"))|.listen_port' "$f1" | head -n1)
     sni=$(jq -r '..|objects|select(has("server_name"))|.server_name' "$f1" | head -n1)
     pub=$(cat "${CONF_DIR}/reality_public.key" 2>/dev/null || echo "")
+    short_id=$(cat "${CONF_DIR}/reality_short_id.key" 2>/dev/null || echo "")
     server_ip=$(curl -s https://api.ip.sb/ip || echo "YOUR_IP")
-    link="vless://${uuid}@${server_ip}:${port}?encryption=none&security=reality&sni=${sni}&fp=chrome&pbk=${pub}&type=tcp#VLESS-REALITY"
+    link="vless://${uuid}@${server_ip}:${port}?encryption=none&security=reality&sni=${sni}&fp=chrome&pbk=${pub}&sid=${short_id}&type=tcp#VLESS-REALITY"
 
     echo "🔹 VLESS Reality"
     echo -e "${YELLOW}${link}${RESET}"
@@ -764,7 +752,6 @@ show_generated_links() {
   fi
 }
 
-
 # ---------- 快捷命令 ----------
 install_shortcut() {
   local cmd_path="/usr/local/bin/menu"
@@ -776,11 +763,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/tianhei211/install/main/instal
 EOF
 
   chmod +x "$cmd_path"
-
-  # Show message clearly to user
-  echo -e "\033[32m\033[01m❔重新打开安装菜单请输入：\033[0m\033[33mmenu\033[0m"
 }
-
 
 # ---------- 主菜单 ----------
 main_menu() {
@@ -823,7 +806,6 @@ echo -e "==================================="
   esac
 
 }
-
 
 # ---------- 引导 ----------
 need_root
