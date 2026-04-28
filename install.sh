@@ -772,7 +772,7 @@ install_shortcut() {
   # Create shortcut script
   cat > "$cmd_path" <<'EOF'
 #!/usr/bin/env bash
-bash <(curl -Ls https://raw.githubusercontent.com/dabadabader/install/main/installer.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/tianhei211/install/main/installer.sh)
 EOF
 
   chmod +x "$cmd_path"
@@ -790,11 +790,10 @@ main_menu() {
 LINK_PINGIP="${ESC}]8;;https://pingip.cn${ESC}\\${YELLOW}pingip.cn${RESET}${ESC}]8;;${ESC}\\"
 
 
-  echo -e "${YELLOW}┌─────────────────────────────────┐${RESET}"
-  echo -e "${YELLOW}│${RESET}   ${LINK} | ${LINK} | ${LINK}   ${YELLOW}│"
-  echo -e "${YELLOW}│${RESET}     ${GREEN}覆盖全球的TikTok服务商${RESET}      ${YELLOW}│"
-  echo -e "${YELLOW}│${RESET}       ${GREEN}提供各国原生家宽IP${RESET}        ${YELLOW}│"
-  echo -e "${YELLOW}└─────────────────────────────────┘${RESET}"        
+  echo -e "${GREEN}┌─────────────────────────────────┐${RESET}"
+  echo -e "${GREEN}│        Sing-Box 一键部署脚本       │${RESET}"
+  echo -e "${GREEN}│      VLESS / VMESS / SS 全能工具     │${RESET}"
+  echo -e "${GREEN}└─────────────────────────────────┘${RESET}"     
 echo -e "==================================="
 echo -e "    ${GREEN}查询IP可以使用:${RESET}  ${LINK_PINGIP}"
 echo -e "==================================="
@@ -835,5 +834,3 @@ install_shortcut
 auto_cleanup_old_configs
 merge_config
 main_menu
-
-
