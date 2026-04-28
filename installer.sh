@@ -412,7 +412,6 @@ EOF
 
   ok "✅ VLESS + TCP + Reality 安装完成"
 
-
   ensure_qrencode
   # 【修改】链接增加 &sid= 适配 v2rayNG
   link="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&security=reality&sni=${TLS_DOMAIN}&fp=chrome&pbk=${pub}&sid=${short_id}&type=tcp#VLESS-REALITY"
@@ -421,10 +420,11 @@ EOF
   echo "$clean_link"
   echo
   if command -v qrencode >/dev/null 2>&1; then
-    qrencode -t ANSIUTF8 -m 1 -s 1 "$clean_link"
+    # 改为 v2rayNG 可识别纯文本二维码
+    qrencode -t TEXT -m 2 -s 2 "$clean_link"
     echo
-     echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
-  echo
+    echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
+    echo
   else
     warn "未检测到 qrencode，无法生成二维码。"
   fi
@@ -448,7 +448,6 @@ install_vmess_ws() {
   ok "开始安装 VMESS + WS协议"
 
   rm -f "${CONF_DIR}/13_vmess_ws.json"
-
 
   ensure_singbox
   ensure_systemd_service
@@ -501,10 +500,11 @@ EOF
 
   echo
   if command -v qrencode >/dev/null 2>&1; then
-    qrencode -t ANSIUTF8 -m 1 -s 1 "$clean_link"
+    # 改为 v2rayNG 可识别纯文本二维码
+    qrencode -t TEXT -m 2 -s 2 "$clean_link"
     echo
-     echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
-  echo
+    echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
+    echo
   else
     warn "未检测到 qrencode，无法生成二维码。"
   fi
@@ -557,9 +557,10 @@ EOF
 
   echo
   if command -v qrencode >/dev/null 2>&1; then
-    qrencode -t ANSIUTF8 -m 1 -s 1 "$clean_link"
+    # 改为 v2rayNG 可识别纯文本二维码
+    qrencode -t TEXT -m 2 -s 2 "$clean_link"
     echo
-     echo -e "\033[01m如果需要重新打开安装菜单，请输入：menu"
+    echo -e "\033[01m如果需要重新打开安装菜单，请输入：menu"
     echo
   else
     warn "未检测到 qrencode，无法生成二维码。"
@@ -576,7 +577,7 @@ enable_bbr() {
   sysctl net.ipv4.tcp_congestion_control
   ok "BBR 处理完成。"
   echo
-   echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
+  echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
   echo
 }
 
@@ -635,7 +636,7 @@ change_user_cred() {
       svc_restart
       ok "VLESS UUID 已修改。"
       echo
-       echo -e "\033[01m如果需要重新打开安装菜单，请输入：menu"
+      echo -e "\033[01m如果需要重新打开安装菜单，请输入：menu"
       echo
       ;;
     2)
@@ -703,7 +704,8 @@ show_generated_links() {
     echo -e "${YELLOW}${link}${RESET}"
     echo
     if command -v qrencode >/dev/null 2>&1; then
-      qrencode -t ANSIUTF8 -m 1 -s 1 "$link"
+      # 改为 v2rayNG 可识别纯文本二维码
+      qrencode -t TEXT -m 2 -s 2 "$link"
       echo
       echo -e "\033[01m重新打开菜单输入：menu"
       echo
@@ -733,7 +735,8 @@ show_generated_links() {
     echo -e "${YELLOW}${link}${RESET}"
     echo
     if command -v qrencode >/dev/null 2>&1; then
-      qrencode -t ANSIUTF8 -m 1 -s 1 "$link"
+      # 改为 v2rayNG 可识别纯文本二维码
+      qrencode -t TEXT -m 2 -s 2 "$link"
       echo
       echo -e "\033[01m重新打开菜单输入：menu"
       echo
@@ -758,7 +761,8 @@ show_generated_links() {
     echo -e "${YELLOW}${link}${RESET}"
     echo
     if command -v qrencode >/dev/null 2>&1; then
-      qrencode -t ANSIUTF8 -m 1 -s 1 "$link"
+      # 改为 v2rayNG 可识别纯文本二维码
+      qrencode -t TEXT -m 2 -s 2 "$link"
       echo
       echo -e "\033[01m重新打开菜单输入：menu"
       echo  
@@ -768,7 +772,7 @@ show_generated_links() {
   fi
 
   if [ "$found_any" = false ]; then
-    warn "未检测到任何已安装的协议配置。"
+    warn "未检测到任何已安装的配置。"
   fi
 }
 
@@ -799,7 +803,7 @@ LINK_PINGIP="${ESC}]8;;https://pingip.cn${ESC}\\${YELLOW}pingip.cn${RESET}${ESC}
 
 
   echo -e "${GREEN}┌─────────────────────────────────┐${RESET}"
-  echo -e "${GREEN}│    老王 Sing-Box 一键部署脚本       │${RESET}"
+  echo -e "${GREEN}│        Sing-Box 一键部署脚本       │${RESET}"
   echo -e "${GREEN}│      VLESS / VMESS / SS 全能工具     │${RESET}"
   echo -e "${GREEN}└─────────────────────────────────┘${RESET}"     
 echo -e "==================================="
