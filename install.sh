@@ -786,14 +786,14 @@ EOF
 main_menu() {
   clear
 
-  LINK="${ESC}]8;;https://wepc.au${ESC}\\${YELLOW}wepc.au${RESET}${ESC}]8;;${ESC}\\"
+  LINK="${ESC}]8;;https://qiaomin.wang${ESC}\\${YELLOW}qiaomin.wang${RESET}${ESC}]8;;${ESC}\\"
 LINK_PINGIP="${ESC}]8;;https://pingip.cn${ESC}\\${YELLOW}pingip.cn${RESET}${ESC}]8;;${ESC}\\"
 
 
   echo -e "${YELLOW}┌─────────────────────────────────┐${RESET}"
   echo -e "${YELLOW}│${RESET}   ${LINK} | ${LINK} | ${LINK}   ${YELLOW}│"
-  echo -e "${YELLOW}│${RESET}     ${GREEN}覆盖全球的TikTok服务商${RESET}      ${YELLOW}│"
-  echo -e "${YELLOW}│${RESET}       ${GREEN}提供各国原生家宽IP${RESET}        ${YELLOW}│"
+  echo -e "${YELLOW}│${RESET}     ${GREEN}天黑路滑${RESET}      ${YELLOW}│"
+  echo -e "${YELLOW}│${RESET}       ${GREEN}社会复杂${RESET}        ${YELLOW}│"
   echo -e "${YELLOW}└─────────────────────────────────┘${RESET}"        
 echo -e "==================================="
 echo -e "    ${GREEN}查询IP可以使用:${RESET}  ${LINK_PINGIP}"
@@ -835,4 +835,3 @@ install_shortcut
 auto_cleanup_old_configs
 merge_config
 main_menu
-
