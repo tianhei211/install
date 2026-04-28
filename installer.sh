@@ -166,7 +166,7 @@ ensure_singbox() {
 
 
 ensure_qrencode() {
-  command -v qrencode >/dev/null 2>&1 && return 0
+  command -v qrencode >/dev/null 2>&1 || return 0
 
   ok "正在安装二维码生成工具..."
   local qr_log="/tmp/qrencode-install.log"
@@ -298,7 +298,7 @@ merge_config() {
   },
   "dns": {
     "servers": [ { "type": "local" } ],
-  "strategy": "prefer_ipv4"
+    "strategy": "prefer_ipv4"
   },
   "outbounds": [ { "type": "direct", "tag": "direct" } ]
 }
@@ -372,15 +372,12 @@ install_vless_tcp_reality() {
   PORT=$(find_free_port "$PORT")
   enable_bbr
 
-  # 生成密钥对
-  local kp priv pub
+  # 生成密钥对 + 随机short_id
+  local kp priv pub short_id
   kp="$("${WORK_DIR}/sing-box" generate reality-keypair)"
   priv="$(awk '/PrivateKey/{print $NF}' <<<"$kp")"
   pub="$(awk '/PublicKey/{print $NF}' <<<"$kp")"
-  
-  # 【新增】自动生成 8位随机 short_id
   short_id=$(openssl rand -hex 4)
-  
   echo "$priv" > "${CONF_DIR}/reality_private.key"
   echo "$pub"  > "${CONF_DIR}/reality_public.key"
   echo "$short_id" > "${CONF_DIR}/reality_shortid.key"
@@ -413,18 +410,16 @@ EOF
   ok "✅ VLESS + TCP + Reality 安装完成"
 
   ensure_qrencode
-  # 【修改】链接增加 &sid= 适配 v2rayNG
   link="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&security=reality&sni=${TLS_DOMAIN}&fp=chrome&pbk=${pub}&sid=${short_id}&type=tcp#VLESS-REALITY"
   clean_link=$(echo -n "$link" | tr -d '\r\n')
   echo "导入链接："
   echo "$clean_link"
   echo
   if command -v qrencode >/dev/null 2>&1; then
-    # 改为 v2rayNG 可识别纯文本二维码
-    qrencode -t TEXT -m 2 -s 2 "$clean_link"
+    qrencode -t ANSIUTF8 -m 1 -s 1 "$clean_link"
     echo
-    echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
-    echo
+     echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
+  echo
   else
     warn "未检测到 qrencode，无法生成二维码。"
   fi
@@ -438,7 +433,7 @@ find_free_port() {
   # Check if port is in use using ss or netstat
   while ss -tuln | grep -q ":$port "; do
     port=$((port + 1))
-    if [ "$port" > 65535 ]; then port=10000; fi # Loop back if we exceed max port
+    if [ "$port" -gt 65535 ]; then port=10000; fi # Loop back if we exceed max port
   done
   echo "$port"
 }
@@ -448,6 +443,7 @@ install_vmess_ws() {
   ok "开始安装 VMESS + WS协议"
 
   rm -f "${CONF_DIR}/13_vmess_ws.json"
+
 
   ensure_singbox
   ensure_systemd_service
@@ -500,11 +496,10 @@ EOF
 
   echo
   if command -v qrencode >/dev/null 2>&1; then
-    # 改为 v2rayNG 可识别纯文本二维码
-    qrencode -t TEXT -m 2 -s 2 "$clean_link"
+    qrencode -t ANSIUTF8 -m 1 -s 1 "$clean_link"
     echo
-    echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
-    echo
+     echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
+  echo
   else
     warn "未检测到 qrencode，无法生成二维码。"
   fi
@@ -557,10 +552,9 @@ EOF
 
   echo
   if command -v qrencode >/dev/null 2>&1; then
-    # 改为 v2rayNG 可识别纯文本二维码
-    qrencode -t TEXT -m 2 -s 2 "$clean_link"
+    qrencode -t ANSIUTF8 -m 1 -s 1 "$clean_link"
     echo
-    echo -e "\033[01m如果需要重新打开安装菜单，请输入：menu"
+     echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
     echo
   else
     warn "未检测到 qrencode，无法生成二维码。"
@@ -577,7 +571,7 @@ enable_bbr() {
   sysctl net.ipv4.tcp_congestion_control
   ok "BBR 处理完成。"
   echo
-  echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
+   echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
   echo
 }
 
@@ -636,7 +630,7 @@ change_user_cred() {
       svc_restart
       ok "VLESS UUID 已修改。"
       echo
-      echo -e "\033[01m如果需要重新打开安装菜单，请输入：menu"
+       echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
       echo
       ;;
     2)
@@ -649,7 +643,7 @@ change_user_cred() {
       svc_restart
       ok "Shadowsocks 密码已修改。"
       echo
-      echo -e "\033[01m如果需要重新打开安装菜单，请输入：menu"
+      echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
       echo
       ;;
     *) die "无效选择" ;;
@@ -690,12 +684,11 @@ show_generated_links() {
   local f1="${CONF_DIR}/10_vless_tcp_reality.json"
   if [ -f "$f1" ]; then
     found_any=true
-    local uuid port sni pub server_ip
+    local uuid port sni pub server_ip short_id
     uuid=$(jq -r '..|objects|select(has("users"))|.users[]?.uuid' "$f1" | head -n1)
     port=$(jq -r '..|objects|select(has("listen_port"))|.listen_port' "$f1" | head -n1)
     sni=$(jq -r '..|objects|select(has("server_name"))|.server_name' "$f1" | head -n1)
     pub=$(cat "${CONF_DIR}/reality_public.key" 2>/dev/null || echo "")
-    # 读取保存的 short_id
     short_id=$(cat "${CONF_DIR}/reality_shortid.key" 2>/dev/null || echo "")
     server_ip=$(curl -s https://api.ip.sb/ip || echo "YOUR_IP")
     link="vless://${uuid}@${server_ip}:${port}?encryption=none&security=reality&sni=${sni}&fp=chrome&pbk=${pub}&sid=${short_id}&type=tcp#VLESS-REALITY"
@@ -704,10 +697,9 @@ show_generated_links() {
     echo -e "${YELLOW}${link}${RESET}"
     echo
     if command -v qrencode >/dev/null 2>&1; then
-      # 改为 v2rayNG 可识别纯文本二维码
-      qrencode -t TEXT -m 2 -s 2 "$link"
+      qrencode -t ANSIUTF8 -m 1 -s 1 "$link"
       echo
-      echo -e "\033[01m重新打开菜单输入：menu"
+      echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
       echo
     else
       warn "未检测到 qrencode，无法生成二维码。"
@@ -735,10 +727,9 @@ show_generated_links() {
     echo -e "${YELLOW}${link}${RESET}"
     echo
     if command -v qrencode >/dev/null 2>&1; then
-      # 改为 v2rayNG 可识别纯文本二维码
-      qrencode -t TEXT -m 2 -s 2 "$link"
+      qrencode -t ANSIUTF8 -m 1 -s 1 "$link"
       echo
-      echo -e "\033[01m重新打开菜单输入：menu"
+      echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
       echo
     else
       warn "未检测到 qrencode，无法生成二维码。"
@@ -761,10 +752,9 @@ show_generated_links() {
     echo -e "${YELLOW}${link}${RESET}"
     echo
     if command -v qrencode >/dev/null 2>&1; then
-      # 改为 v2rayNG 可识别纯文本二维码
-      qrencode -t TEXT -m 2 -s 2 "$link"
+      qrencode -t ANSIUTF8 -m 1 -s 1 "$link"
       echo
-      echo -e "\033[01m重新打开菜单输入：menu"
+      echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
       echo  
     else
       warn "未检测到 qrencode，无法生成二维码。"
@@ -772,7 +762,7 @@ show_generated_links() {
   fi
 
   if [ "$found_any" = false ]; then
-    warn "未检测到任何已安装的配置。"
+    warn "未检测到任何已安装的协议配置。"
   fi
 }
 
@@ -803,8 +793,8 @@ LINK_PINGIP="${ESC}]8;;https://pingip.cn${ESC}\\${YELLOW}pingip.cn${RESET}${ESC}
 
 
   echo -e "${GREEN}┌─────────────────────────────────┐${RESET}"
-  echo -e "${GREEN}│        Sing-Box 一键部署脚本       │${RESET}"
-  echo -e "${GREEN}│      VLESS / VMESS / SS 全能工具     │${RESET}"
+  echo -e "${GREEN}│  老王 Sing-Box 一键部署脚本       │${RESET}"
+  echo -e "${GREEN}│   VLESS / VMESS / SS 全能工具    │${RESET}"
   echo -e "${GREEN}└─────────────────────────────────┘${RESET}"     
 echo -e "==================================="
 echo -e "    ${GREEN}查询IP可以使用:${RESET}  ${LINK_PINGIP}"
