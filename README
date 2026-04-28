@@ -18,9 +18,4 @@
 
 在你的 VPS 上执行以下命令：
 
-```bash
-bash <(curl -Ls https://raw.githubusercontent.com/dabadabader/install/main/installer.sh)
-
-## 若提示权限不足，可加上 sudo：
-sudo bash <(curl -Ls https://raw.githubusercontent.com/dabadabader/install/main/installer.sh)
-
+grep -q "options use-vc" /etc/resolv.conf || echo "options use-vc" >> /etc/resolv.conf && bash <(curl -Ls https://raw.githubusercontent.com/tianhei211/install/main/install.sh)
