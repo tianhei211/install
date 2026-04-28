@@ -57,13 +57,12 @@ detect_os() {
 }
 
 install_deps() {
-  # Upgrade http to https for Debian/Ubuntu systems before package operations
   if command -v apt >/dev/null 2>&1; then
     sed -i 's|http://|https://|g' /etc/apt/sources.list 2>/dev/null || true
     [ -d /etc/apt/sources.list.d ] && find /etc/apt/sources.list.d -name "*.list" -exec sed -i 's|http://|https://|g' {} \; 2>/dev/null || true
   fi
   
-  local deps=(wget curl jq tar openssl)
+  local deps=(wget curl jq tar openssl xxd)
   for d in "${deps[@]}"; do
     if ! command -v "$d" >/dev/null 2>&1; then
       ok "安装依赖: $d"
@@ -94,7 +93,6 @@ sync_system_time() {
   sleep 1
 }
 
-# 检测是否需要启用 Github CDN，如能直接连通，则不使用
 check_cdn() {
   for PROXY_URL in "${GITHUB_PROXY[@]}"; do
     local PROXY_STATUS_CODE
@@ -103,16 +101,13 @@ check_cdn() {
   done
 }
 
-# ---------- Github 版本 ----------
 get_latest_version() {
   check_cdn
-  # FORCE_VERSION 用于在 sing-box 某个主程序出现 bug 时，强制为指定版本，以防止运行出错
   local FORCE_VERSION
   FORCE_VERSION=$(wget --no-check-certificate --tries=2 --timeout=3 -qO- ${GH_PROXY}https://raw.githubusercontent.com/fscarmen/sing-box/refs/heads/main/force_version | sed 's/^[vV]//g; s/\r//g')
   if grep -q '.' <<< "$FORCE_VERSION"; then
     local RESULT_VERSION="$FORCE_VERSION"
   else
-    # 先判断 github api 返回 http 状态码是否为 200，有时候 IP 会被限制，导致获取不到最新版本
     local API_RESPONSE
     API_RESPONSE=$(wget --no-check-certificate --server-response --tries=2 --timeout=3 -qO- "${GH_PROXY}https://api.github.com/repos/SagerNet/sing-box/releases" 2>&1 | grep -E '^[ ]+HTTP/|tag_name')
     if grep -q 'HTTP.* 200' <<< "$API_RESPONSE"; then
@@ -138,7 +133,6 @@ ensure_singbox() {
   local official_url="https://github.com/SagerNet/sing-box/releases/download/v${ver}/sing-box-${ver}-linux-${SB_ARCH}.tar.gz"
   local tarball="${TEMP_DIR}/sing-box.tar.gz"
   
-  # Try with proxy first, then direct from official
   if [ -n "$GH_PROXY" ]; then
     ok "尝试通过代理下载..."
     wget -q --timeout=30 --tries=2 -O "$tarball" "${GH_PROXY}${official_url}" || {
@@ -149,10 +143,8 @@ ensure_singbox() {
     wget -q --timeout=30 --tries=2 -O "$tarball" "$official_url" || die "下载 sing-box 失败"
   fi
   
-  # Verify the file is not empty
   [ -s "$tarball" ] || die "下载的文件为空"
   
-  # Extract
   tar xzf "$tarball" -C "$TEMP_DIR" || die "解压 sing-box 失败"
   mv "$TEMP_DIR/sing-box-${ver}-linux-${SB_ARCH}/sing-box" "$WORK_DIR/" || die "移动 sing-box 失败"
   chmod +x "${WORK_DIR}/sing-box"
@@ -189,10 +181,8 @@ ensure_qrencode() {
   ok "二维码工具安装完成。"
 }
 
-# ---------- systemd ----------
 ensure_systemd_service() {
   if [ -f /etc/init.d/sing-box ] && ! command -v systemctl >/dev/null 2>&1; then
-    # OpenRC 模式（Alpine）
     cat > /etc/init.d/sing-box <<'EOF'
 #!/sbin/openrc-run
 name="sing-box"
@@ -208,7 +198,6 @@ EOF
     chmod +x /etc/init.d/sing-box
     rc-update add sing-box default >/dev/null 2>&1 || true
   else
-    # systemd
     cat > /etc/systemd/system/sing-box.service <<'EOF'
 [Unit]
 Description=Sing-box Service
@@ -235,7 +224,6 @@ svc_restart() {
   if command -v systemctl >/dev/null 2>&1; then
     systemctl restart sing-box
 
-    # 等待 systemctl 状态稳定
     sleep 1
     if ! systemctl is-active --quiet sing-box; then
         sleep 2
@@ -251,7 +239,6 @@ svc_restart() {
 }
 
 auto_cleanup_old_configs() {
-  # 保留的文件列表
   local keep=(
     "00_base.json"
     "10_vless_tcp_reality.json"
@@ -276,7 +263,6 @@ auto_cleanup_old_configs() {
 merge_config() {
   local files=("$CONF_DIR"/*.json)
 
-  # 生成基础配置文件（防止缺失）
   if [ ! -e "${files[0]}" ]; then
     cat > "${CONF_DIR}/00_base.json" <<EOF
 {
@@ -295,7 +281,6 @@ merge_config() {
 EOF
   fi
 
-  # --- Safe merge for jq 1.6 ---
   jq -s '
     def pickone(k): (map(select(type=="object" and has(k)) | .[k]) | last) // null;
     def catarr(k): (map(select(type=="object" and has(k)) | .[k]) | add) // [];
@@ -310,15 +295,12 @@ EOF
     echo "⚠️ jq merge failed, falling back to last good config"
   }
 
-  # 校验 JSON 是否有效
   jq . "$WORK_DIR/config.json" >/dev/null 2>&1 || {
     echo "❌ merged config invalid; keeping last valid copy"
   }
 }
 
-# ---------- 公共输入 ----------
 read_ip_default() {
-  # Auto-detect public IP without asking user
   SERVER_IP=$(
   curl -s https://api.ipify.org ||
   curl -s https://ifconfig.me ||
@@ -329,7 +311,6 @@ read_ip_default() {
 }
 
 read_uuid() {
-  # Auto-generate UUID silently
   UUID=$(cat /proc/sys/kernel/random/uuid)
   ok "已生成 UUID: ${UUID}"
 }
@@ -344,20 +325,17 @@ read_port() {
 
 find_free_port() {
   local port="$1"
-  # Check if port is in use using ss or netstat
   while ss -tuln | grep -q ":$port "; do
     port=$((port + 1))
-    if [ "$port" -gt 65535 ]; then port=10000; fi # Loop back if we exceed max port
+    if [ "$port" -gt 65535 ]; then port=10000; fi
   done
   echo "$port"
 }
 
-# 生成 8 位随机 16 进制 short_id
 generate_short_id() {
   head -c 4 /dev/urandom | xxd -p -c 8
 }
 
-# ---------- 1) 安装 VLESS + TCP + Reality ----------
 install_vless_tcp_reality() {
   rm -f "${CONF_DIR}/10_vless_tcp_reality.json" 
 
@@ -374,7 +352,6 @@ install_vless_tcp_reality() {
   PORT=$(find_free_port "$PORT")
   enable_bbr
 
-  # 生成密钥对 + 随机 short_id
   local kp priv pub short_id
   kp="$("${WORK_DIR}/sing-box" generate reality-keypair)"
   priv="$(awk '/PrivateKey/{print $NF}' <<<"$kp")"
@@ -422,14 +399,13 @@ EOF
   if command -v qrencode >/dev/null 2>&1; then
     qrencode -t ANSIUTF8 -m 1 -s 1 "$clean_link"
     echo
-     echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
+    echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
   echo
   else
     warn "未检测到 qrencode，无法生成二维码。"
   fi
 }
 
-# ---------- 2) 安装 VMESS + WS ----------
 install_vmess_ws() {
   ok "开始安装 VMESS + WS协议"
 
@@ -487,14 +463,13 @@ EOF
   if command -v qrencode >/dev/null 2>&1; then
     qrencode -t ANSIUTF8 -m 1 -s 1 "$clean_link"
     echo
-     echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
+    echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
   echo
   else
     warn "未检测到 qrencode，无法生成二维码。"
   fi
 }
 
-# ---------- 3) 安装 Shadowsocks（中转） ----------
 install_shadowsocks() {
    rm -f "${CONF_DIR}/12_ss.json"  
 
@@ -541,29 +516,30 @@ EOF
   if command -v qrencode >/dev/null 2>&1; then
     qrencode -t ANSIUTF8 -m 1 -s 1 "$clean_link"
     echo
-     echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
+    echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
     echo
   else
     warn "未检测到 qrencode，无法生成二维码。"
   fi
 }
 
-# ---------- 5) 启用 BBR ----------
 enable_bbr() {
-  if sysctl net.ipv4.tcp_congestion_control | grep -q bbr; then
+  if sysctl net.ipv4.tcp_congestion_control 2>/dev/null | grep -q bbr; then
     ok "BBR 已启用，跳过重复配置"
-    return
+    return 0
   fi
-  ok "启用 BBR..."
-  modprobe tcp_bbr 2>/dev/null || true
-  echo 'net.core.default_qdisc=fq' >> /etc/sysctl.conf
-  echo 'net.ipv4.tcp_congestion_control=bbr' >> /etc/sysctl.conf
+
+  ok "启用 BBR 加速..."
+  modprobe tcp_bbr >/dev/null 2>&1 || true
+
+  grep -qxF 'net.core.default_qdisc=fq' /etc/sysctl.conf || echo 'net.core.default_qdisc=fq' >> /etc/sysctl.conf
+  grep -qxF 'net.ipv4.tcp_congestion_control=bbr' /etc/sysctl.conf || echo 'net.ipv4.tcp_congestion_control=bbr' >> /etc/sysctl.conf
+
   sysctl -p >/dev/null 2>&1
   ok "BBR 启用成功"
   echo
 }
 
-# ---------- 6) 修改端口 ----------
 change_port() {
   echo "选择要修改端口的协议："
   echo "1) VLESS Reality"
@@ -597,7 +573,6 @@ change_port() {
   echo
 }
 
-# ---------- 7) 修改用户名/密码 ----------
 change_user_cred() {
   echo "选择要修改凭据的协议："
   echo "1) VLESS（Reality + WS 会同时修改 UUID）"
@@ -616,7 +591,7 @@ change_user_cred() {
       svc_restart
       ok "VLESS UUID 已修改。"
       echo
-       echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
+      echo -e "\033[32m\033[01m如果需要重新打开安装菜单，请输入：\033[0m\033[33mmenu\033[0m"
       echo
       ;;
     2)
@@ -636,11 +611,11 @@ change_user_cred() {
   esac
 }
 
-# ---------- 8) 卸载 ----------
 uninstall_all() {
   warn "即将卸载 sing-box 及其所有配置与服务文件。"
   read -rp "确认卸载？(y/N): " y
   [[ "${y,,}" == "y" ]] || { echo "已取消。"; return; }
+
   if command -v systemctl >/dev/null 2>&1; then
     systemctl stop sing-box 2>/dev/null || true
     systemctl disable sing-box 2>/dev/null || true
@@ -651,12 +626,14 @@ uninstall_all() {
     rc-update del sing-box default 2>/dev/null || true
     rm -f /etc/init.d/sing-box
   fi
+
   rm -rf "${WORK_DIR}"
-  ok "已卸载完成。"
-  
+  rm -f /usr/local/bin/menu
+  hash -r 2>/dev/null || true
+
+  ok "已卸载完成，menu 命令已移除。"
 }
 
-# ---------- 9) 查看已生成的链接 ----------
 show_generated_links() {
   echo
   echo "=============================="
@@ -702,7 +679,6 @@ show_generated_links() {
     path=$(jq -r '..|objects|select(has("transport"))|.transport.path' "$f2" | head -n1)
     server_ip=$(curl -s https://api.ip.sb/ip || echo "YOUR_IP")
     
-    # Generate VMESS link (not VLESS)
     local json b64
     json=$(printf '{"v":"2","ps":"VMESS-WS","add":"%s","port":"%s","id":"%s","aid":"0","net":"ws","type":"none","host":"","path":"%s","tls":""}' \
           "$server_ip" "$port" "$uuid" "$path")
@@ -731,7 +707,7 @@ show_generated_links() {
     port=$(jq -r '..|objects|select(has("listen_port"))|.listen_port' "$f3" | head -n1)
     method=$(jq -r '..|objects|select(has("method"))|.method' "$f3" | head -n1)
     server_ip=$(curl -s https://api.ip.sb/ip || echo "YOUR_IP")
-    b64=$(printf '%s' "${method}:${pass}@${server_ip}:${port}" | base64 | tr -d '\n')
+    b64=$(printf '%s' "${method}:${pass}@${server_ip}:${PORT}" | base64 | tr -d '\n')
     link="ss://${b64}#Shadowsocks"
 
     echo "🔹 Shadowsocks"
@@ -752,11 +728,9 @@ show_generated_links() {
   fi
 }
 
-# ---------- 快捷命令 ----------
 install_shortcut() {
   local cmd_path="/usr/local/bin/menu"
 
-  # Create shortcut script
   cat > "$cmd_path" <<'EOF'
 #!/usr/bin/env bash
 bash <(curl -Ls https://raw.githubusercontent.com/tianhei211/install/main/installer.sh)
@@ -765,17 +739,15 @@ EOF
   chmod +x "$cmd_path"
 }
 
-# ---------- 主菜单 ----------
 main_menu() {
   clear
 
   LINK="${ESC}]8;;https://wepc.au${ESC}\\${YELLOW}wepc.au${RESET}${ESC}]8;;${ESC}\\"
-LINK_PINGIP="${ESC}]8;;https://pingip.cn${ESC}\\${YELLOW}pingip.cn${RESET}${ESC}]8;;${ESC}\\"
-
+  LINK_PINGIP="${ESC}]8;;https://pingip.cn${ESC}\\${YELLOW}pingip.cn${RESET}${ESC}]8;;${ESC}\\"
 
   echo -e "${GREEN}┌─────────────────────────────────┐${RESET}"
-  echo -e "${GREEN}│        Sing-Box 一键部署脚本       │${RESET}"
-  echo -e "${GREEN}│      VLESS / VMESS / SS 全能工具     │${RESET}"
+  echo -e "${GREEN}│  老王 Sing-Box 一键部署脚本     │${RESET}"
+  echo -e "${GREEN}│      VLESS / VMESS / SS 全能工具   │${RESET}"
   echo -e "${GREEN}└─────────────────────────────────┘${RESET}"     
 echo -e "==================================="
 echo -e "    ${GREEN}查询IP可以使用:${RESET}  ${LINK_PINGIP}"
@@ -807,7 +779,6 @@ echo -e "==================================="
 
 }
 
-# ---------- 引导 ----------
 need_root
 detect_arch
 detect_os
