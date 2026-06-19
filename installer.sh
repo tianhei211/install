@@ -440,7 +440,7 @@ EOF
   ok "✅ VLESS + TCP + Reality 安装完成"
 
   ensure_qrencode
-  link="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&security=reality&sni=${TLS_DOMAIN}&fp=chrome&pbk=${pub}&sid=${short_id}&type=tcp#VLESS-REALITY"
+  link="vless://${UUID}@${SERVER_IP}:${PORT}?encryption=none&security=reality&sni=${TLS_DOMAIN}&fp=chrome&pbk=${pub}&sid=${short_id}&type=tcp#世界那么大,我想去看看"
   clean_link=$(echo -n "$link" | tr -d '\r\n')
   echo "导入链接："
   echo "$clean_link"
@@ -710,7 +710,7 @@ show_generated_links() {
     pub=$(cat "${CONF_DIR}/reality_public.key" 2>/dev/null || echo "")
     short_id=$(cat "${CONF_DIR}/reality_shortid.key" 2>/dev/null || echo "")
     server_ip=$(curl -s https://api.ip.sb/ip || echo "YOUR_IP")
-    link="vless://${uuid}@${server_ip}:${port}?encryption=none&security=reality&sni=${sni}&fp=chrome&pbk=${pub}&sid=${short_id}&type=tcp#VLESS-REALITY"
+    link="vless://${uuid}@${server_ip}:${port}?encryption=none&security=reality&sni=${sni}&fp=chrome&pbk=${pub}&sid=${short_id}&type=tcp#世界那么大,我想去看看"
 
     echo "🔹 VLESS Reality"
     echo -e "${YELLOW}${link}${RESET}"
