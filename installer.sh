@@ -11,8 +11,7 @@ CONF_DIR="${WORK_DIR}/conf"
 DEFAULT_PORT_REALITY=$((RANDOM % 50001 + 10000))
 DEFAULT_PORT_WS=$((RANDOM % 50001 + 10000))
 DEFAULT_PORT_SS=$((RANDOM % 50001 + 10000))
-# 修改1：默认Reality握手域名改为微软官网
-TLS_SERVER_DEFAULT='www.microsoft.com'
+TLS_SERVER_DEFAULT='addons.mozilla.org'
 DEFAULT_NEWEST_VERSION='1.13.0-rc.4'
 export DEBIAN_FRONTEND=noninteractive
 
@@ -336,7 +335,7 @@ read_ip_default() {
   curl -s https://ifconfig.me ||
   curl -s https://icanhazip.com ||
   echo "127.0.0.1"
-  )
+)
   ok "检测到公网 IP: ${SERVER_IP}"
 }
 
@@ -352,20 +351,6 @@ read_port() {
   PORT="${PORT:-$def}"
   [[ "$PORT" =~ ^[0-9]+$ ]] || die "端口必须为数字。"
   (( PORT>=100 && PORT<=65535 )) || die "端口必须在 100~65535。"
-}
-
-# 修改2：端口检测同时判断TCP+UDP占用
-find_free_port() {
-  local port="$1"
-  while true; do
-    if ss -tuln | grep -q ":$port " || ss -uln | grep -q ":$port "; then
-      port=$((port + 1))
-      if [ "$port" -gt 65535 ]; then port=10000; fi
-    else
-      break
-    fi
-  done
-  echo "$port"
 }
 
 # ---------- 1) 安装 VLESS + TCP + Reality ----------
@@ -396,10 +381,7 @@ install_vless_tcp_reality() {
   echo "$priv" > "${CONF_DIR}/reality_private.key"
   echo "$pub"  > "${CONF_DIR}/reality_public.key"
   echo "$short_id" > "${CONF_DIR}/reality_shortid.key"
-  # 密钥权限加固，仅root可读
-  chmod 600 "${CONF_DIR}/reality_"*.key
 
-  # 修改3：完整Reality加速参数
   cat > "${CONF_DIR}/10_vless_tcp_reality.json" <<EOF
 {
   "inbounds": [{
@@ -407,28 +389,16 @@ install_vless_tcp_reality() {
     "tag": "vless-reality",
     "listen": "::",
     "listen_port": ${PORT},
-    "tcp_fast_open": true,
-    "users": [{
-      "uuid": "${UUID}",
-      "flow": "xtls-rprx-vision"
-    }],
+    "users": [{ "uuid": "${UUID}" }],
     "tls": {
       "enabled": true,
       "server_name": "${TLS_DOMAIN}",
-      "alpn": ["http/1.1"],
-      "min_version": "1.3",
-      "max_version": "1.3",
       "reality": {
         "enabled": true,
         "handshake": { "server": "${TLS_DOMAIN}", "server_port": 443 },
         "private_key": "${priv}",
-        "short_id": ["${short_id}"],
-        "fingerprint": "chrome"
+        "short_id": ["${short_id}"]
       }
-    },
-    "multiplex": {
-      "enabled": true,
-      "max_streams": 64
     }
   }]
 }
@@ -458,6 +428,17 @@ EOF
 
 
 # ---------- 2) 安装 VMESS + WS ----------
+find_free_port() {
+  local port="$1"
+  # Check if port is in use using ss or netstat
+  while ss -tuln | grep -q ":$port "; do
+    port=$((port + 1))
+    if [ "$port" -gt 65535 ]; then port=10000; fi # Loop back if we exceed max port
+  done
+  echo "$port"
+}
+
+
 install_vmess_ws() {
   ok "开始安装 VMESS + WS协议"
 
