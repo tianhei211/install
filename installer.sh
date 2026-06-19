@@ -812,7 +812,7 @@ LINK_PINGIP="${ESC}]8;;https://pingip.cn${ESC}\\${YELLOW}pingip.cn${RESET}${ESC}
 
 
   echo -e "${GREEN}┌─────────────────────────────────┐${RESET}"
-  echo -e "${GREEN}│  老王最新 Sing-Box 一键部署脚本   │${RESET}"
+  echo -e "${GREEN}│  老王专用 Sing-Box 一键部署脚本   │${RESET}"
   echo -e "${GREEN}│   VLESS / VMESS / SS 全能工具    │${RESET}"
   echo -e "${GREEN}└─────────────────────────────────┘${RESET}"     
 echo -e "==================================="
